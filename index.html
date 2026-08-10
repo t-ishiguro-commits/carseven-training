@@ -227,11 +227,14 @@ function createPlayer(ytId){
               var cur=ytPlayer.getCurrentTime();
               var dur=ytPlayer.getDuration();
               currentDuration=dur;
-              // 視聴区間を記録（1秒ごと）
-              if(cur>lastPosition-0.1 && cur<lastPosition+2){
-                // 連続再生
+              // 実際に再生した時間のみカウント（シークは除外）
+              if(cur>lastPosition-0.1 && cur<=lastPosition+1.5){
+                // 1秒以内の連続再生のみカウント（シークバー操作は除外）
                 watchedSegments.push({start:lastPosition,end:cur});
+              } else {
+                // シークが検出された場合はカウントしない
               }
+              lastPosition=cur;
               lastPosition=cur;
               var pct=calcWatchedPct(dur);
               var sec=getTotalWatchedSec();
