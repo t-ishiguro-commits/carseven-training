@@ -228,7 +228,7 @@ function createPlayer(ytId){
               var dur=ytPlayer.getDuration();
               currentDuration=dur;
               // 視聴区間を記録（1秒ごと）
-              if(cur>lastPosition-0.5 && cur<lastPosition+5){
+              if(cur>lastPosition-0.1 && cur<lastPosition+2){
                 // 連続再生
                 watchedSegments.push({start:lastPosition,end:cur});
               }
