@@ -127,10 +127,8 @@ var categoryTests={};
 var ytApiReady=false;
 var pendingYtId=null;
 
-// 累積視聴時間管理
-var watchedSegments=[];  // [{start, end}] 実際に視聴した区間
-var lastPosition=0;
-var isPlaying=false;
+// 再生カウンター（実際に再生していた秒数）
+var playedSeconds=0;
 var currentDuration=0;
 
 var params=new URLSearchParams(location.search);
@@ -152,38 +150,9 @@ async function post(p){
   return res.json();
 }
 
-// 累積視聴率を計算（重複区間を除く）
-function calcWatchedPct(duration){
-  if(!duration||duration<=0) return 0;
-  var merged=[];
-  var segs=watchedSegments.slice().sort(function(a,b){return a.start-b.start;});
-  segs.forEach(function(seg){
-    if(!merged.length||seg.start>merged[merged.length-1].end){
-      merged.push({start:seg.start,end:seg.end});
-    } else {
-      merged[merged.length-1].end=Math.max(merged[merged.length-1].end,seg.end);
-    }
-  });
-  var total=merged.reduce(function(sum,seg){return sum+(seg.end-seg.start);},0);
-  return Math.min(100,Math.floor(total/duration*100));
-}
-
-function getTotalWatchedSec(){
-  var merged=[];
-  var segs=watchedSegments.slice().sort(function(a,b){return a.start-b.start;});
-  segs.forEach(function(seg){
-    if(!merged.length||seg.start>merged[merged.length-1].end){
-      merged.push({start:seg.start,end:seg.end});
-    } else {
-      merged[merged.length-1].end=Math.max(merged[merged.length-1].end,seg.end);
-    }
-  });
-  return merged.reduce(function(sum,seg){return sum+(seg.end-seg.start);},0);
-}
-
 window.onYouTubeIframeAPIReady=function(){
   ytApiReady=true;
-  if(pendingYtId) createPlayer(pendingYtId);
+  if(pendingYtId)createPlayer(pendingYtId);
 };
 
 function createPlayer(ytId){
@@ -191,9 +160,7 @@ function createPlayer(ytId){
   pendingYtId=null;
   if(ytPlayer){try{ytPlayer.destroy();}catch(e){}ytPlayer=null;}
   document.getElementById("yt-player").innerHTML="";
-  watchedSegments=[];
-  lastPosition=0;
-  isPlaying=false;
+  playedSeconds=0;
   currentDuration=0;
 
   ytPlayer=new YT.Player("yt-player",{
@@ -205,65 +172,49 @@ function createPlayer(ytId){
       onReady:function(e){
         currentDuration=e.target.getDuration();
         e.target.playVideo();
-        // 定期ログ（30秒ごと）
+        // 30秒ごとにログ記録
         logTimer=setInterval(function(){
-          if(isPlaying && currentVideoId){
-            var pct=calcWatchedPct(currentDuration);
-            var sec=getTotalWatchedSec();
-            post({action:"addLog",videoId:currentVideoId,event:"視聴中",watchedSec:sec,pct:pct});
+          if(currentVideoId){
+            var pct=currentDuration>0?Math.floor(playedSeconds/currentDuration*100):0;
+            post({action:"addLog",videoId:currentVideoId,event:"視聴中",watchedSec:Math.floor(playedSeconds),pct:pct});
           }
         },30000);
       },
       onStateChange:function(e){
-        var current=0;
-        try{current=ytPlayer.getCurrentTime();}catch(err){}
-
         if(e.data===YT.PlayerState.PLAYING){
-          isPlaying=true;
-          lastPosition=current;
+          // 再生中は1秒ごとにカウントアップ
           clearInterval(watchTimer);
           watchTimer=setInterval(function(){
             try{
-              var cur=ytPlayer.getCurrentTime();
               var dur=ytPlayer.getDuration();
-              currentDuration=dur;
-              // 実際に再生した時間のみカウント（シークは除外）
-              if(cur>lastPosition-0.1 && cur<=lastPosition+1.5){
-                // 1秒以内の連続再生のみカウント（シークバー操作は除外）
-                watchedSegments.push({start:lastPosition,end:cur});
-              } else {
-                // シークが検出された場合はカウントしない
-              }
-              lastPosition=cur;
-              lastPosition=cur;
-              var pct=calcWatchedPct(dur);
-              var sec=getTotalWatchedSec();
-              document.getElementById("progress-bar").style.width=pct+"%";
-              document.getElementById("progress-info").textContent="視聴済み: "+pct+"%（"+Math.floor(sec/60)+"分"+Math.floor(sec%60)+"秒）";
-              if(pct>=90){
-                clearInterval(watchTimer);
-                document.getElementById("progress-info").textContent="視聴完了！受講完了ボタンを押してください";
-                document.getElementById("progress-bar").style.width="100%";
-                document.getElementById("complete-btn").disabled=false;
-                document.getElementById("complete-btn").className="complete-btn enabled";
+              if(dur>0){
+                currentDuration=dur;
+                playedSeconds+=1; // 実際に再生した秒数のみカウント
+                var pct=Math.min(100,Math.floor(playedSeconds/dur*100));
+                document.getElementById("progress-bar").style.width=pct+"%";
+                document.getElementById("progress-info").textContent=
+                  "視聴済み: "+pct+"%（"+Math.floor(playedSeconds/60)+"分"+Math.floor(playedSeconds%60)+"秒）";
+                if(pct>=90){
+                  clearInterval(watchTimer);
+                  document.getElementById("progress-bar").style.width="100%";
+                  document.getElementById("progress-info").textContent="視聴完了！受講完了ボタンを押してください";
+                  document.getElementById("complete-btn").disabled=false;
+                  document.getElementById("complete-btn").className="complete-btn enabled";
+                }
               }
             }catch(err){}
           },1000);
         } else {
-          isPlaying=false;
+          // 一時停止・シーク・停止時はカウント停止
           clearInterval(watchTimer);
-          // 一時停止・シーク時にログ
-          if(currentVideoId){
-            var pct=calcWatchedPct(currentDuration);
-            var sec=getTotalWatchedSec();
-            var evName=e.data===YT.PlayerState.PAUSED?"一時停止":"停止";
-            post({action:"addLog",videoId:currentVideoId,event:evName,watchedSec:sec,pct:pct});
+          if(currentVideoId&&e.data===YT.PlayerState.PAUSED){
+            var pct=currentDuration>0?Math.floor(playedSeconds/currentDuration*100):0;
+            post({action:"addLog",videoId:currentVideoId,event:"一時停止",watchedSec:Math.floor(playedSeconds),pct:pct});
           }
         }
         if(e.data===YT.PlayerState.ENDED){
-          isPlaying=false;
           clearInterval(watchTimer);
-          var pct=calcWatchedPct(currentDuration);
+          // 動画終了時は完了とみなす
           document.getElementById("progress-bar").style.width="100%";
           document.getElementById("progress-info").textContent="視聴完了！受講完了ボタンを押してください";
           document.getElementById("complete-btn").disabled=false;
@@ -379,7 +330,6 @@ function openModal(videoId,ytId,title){
   document.getElementById("progress-info").textContent="動画を最後まで視聴すると完了ボタンが押せます";
   document.getElementById("progress-bar").style.width="0%";
   document.getElementById("modal-bg").className="modal-bg show";
-  // 開始ログ
   post({action:"addLog",videoId:videoId,event:"開始",watchedSec:0,pct:0});
   createPlayer(ytId);
 }
@@ -390,17 +340,15 @@ document.getElementById("modal-bg").addEventListener("click",function(e){if(e.ta
 function closeModal(){
   clearInterval(watchTimer);
   clearInterval(logTimer);
-  // 終了ログ
   if(currentVideoId){
-    var pct=calcWatchedPct(currentDuration);
-    var sec=getTotalWatchedSec();
-    post({action:"addLog",videoId:currentVideoId,event:"終了",watchedSec:sec,pct:pct});
+    var pct=currentDuration>0?Math.floor(playedSeconds/currentDuration*100):0;
+    post({action:"addLog",videoId:currentVideoId,event:"終了",watchedSec:Math.floor(playedSeconds),pct:pct});
   }
   try{if(ytPlayer){ytPlayer.stopVideo();ytPlayer.destroy();ytPlayer=null;}}catch(e){}
   document.getElementById("yt-player").innerHTML="";
   document.getElementById("modal-bg").className="modal-bg";
   currentVideoId=null;
-  watchedSegments=[];
+  playedSeconds=0;
 }
 
 document.getElementById("complete-btn").addEventListener("click",async function(){
