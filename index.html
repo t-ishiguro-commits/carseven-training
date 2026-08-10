@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>研修動画視聴ポータル</title>
+<style>
+:root{--bg:#F0F4F8;--surface:#FFF;--surface2:#E8EEF4;--accent:#E8401C;--accent2:#F5A623;--ok:#27AE60;--danger:#E74C3C;--text:#1A1A2E;--text-muted:#6B7280;--border:#D1D9E0;--radius:12px;--font:'Inter','Noto Sans JP',sans-serif}
+*,::before,::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;padding:24px 16px 64px}
+.header{max-width:1000px;margin:0 auto 32px;display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:var(--radius);padding:12px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.header img{width:40px;height:40px;object-fit:contain}
+.header h1{font-size:1rem;font-weight:700}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.badge{font-size:.78rem;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.admin-btn{font-family:var(--font);font-size:.78rem;font-weight:600;padding:6px 16px;border:none;border-radius:20px;background:var(--accent);color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
+.container{max-width:1000px;margin:0 auto}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 32px;gap:16px;text-align:center}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cat-section{margin-bottom:32px}
+.cat-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:12px 16px;background:var(--surface);border-radius:var(--radius);box-shadow:0 2px 4px rgba(0,0,0,.06)}
+.cat-title-wrap{cursor:pointer;display:flex;align-items:center;gap:10px;flex:1}
+.cat-title{font-size:1rem;font-weight:700}
+.cat-badge{background:var(--accent);color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:600}
+.cat-toggle{color:var(--text-muted);transition:transform .2s}
+.cat-toggle.collapsed{transform:rotate(-90deg)}
+.test-btn{font-family:var(--font);font-size:.8rem;font-weight:600;padding:6px 14px;border:none;border-radius:20px;cursor:pointer;white-space:nowrap}
+.test-btn.on{background:var(--ok);color:#fff}
+.test-btn.off{background:var(--surface2);color:var(--text-muted);cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:8px}
+.grid.hidden{display:none}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform .2s,box-shadow .2s;box-shadow:0 2px 4px rgba(0,0,0,.06)}
+.card.ok:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(232,64,28,.12)}
+.card.ng{opacity:.6}
+.thumb{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#F0F4F8,#D1D9E0);position:relative;cursor:pointer;overflow:hidden}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.thumb span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.5rem;z-index:1}
+.card.ng .thumb{cursor:not-allowed}
+.done-badge{position:absolute;top:8px;left:8px;background:var(--ok);color:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;font-weight:600;z-index:2}
+.lock-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;z-index:2}
+.card-body{padding:14px 16px}
+.card-body h3{font-size:.9rem;font-weight:600;margin-bottom:6px;line-height:1.4}
+.card-status{font-size:.75rem;color:var(--text-muted)}
+.card-status.done{color:var(--ok);font-weight:600}
+.card-status.can{color:var(--accent)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:860px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-head h2{font-size:1rem;font-weight:700}
+.close-btn{background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;line-height:1;padding:4px}
+.yt-wrap{position:relative;width:100%;aspect-ratio:16/9;background:#000}
+.yt-wrap #ytp{position:absolute;inset:0;width:100%;height:100%}
+.modal-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.prog-info{font-size:.82rem;color:var(--text-muted)}
+.prog-bar-wrap{width:100%;height:4px;background:var(--surface2);border-radius:2px;margin-top:6px}
+.prog-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .5s}
+.done-btn{font-family:var(--font);font-size:.9rem;font-weight:600;padding:10px 24px;border:none;border-radius:8px;cursor:pointer;background:var(--surface2);color:var(--text-muted);white-space:nowrap}
+.done-btn.on{background:var(--accent);color:#fff}
+.done-btn:disabled{opacity:.5;cursor:not-allowed}
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:#fff;border-radius:8px;padding:12px 24px;font-size:.88rem;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:999}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:var(--ok)}
+#toast.err{background:var(--danger)}
+</style>
+</head>
+<body>
+<header class="header">
+  <img src="https://drive.google.com/thumbnail?id=1lic6q_rhNDfNxKdJO7FJs-W_AW84_cST&sz=w80">
+  <h1>研修動画視聴ポータル</h1>
+  <div class="header-right">
+    <div class="badge" id="badge">読み込み中</div>
+    <a id="admin-link" href="#" class="admin-btn" style="display:none" target="_blank">管理画面</a>
+  </div>
+</header>
+<div class="container">
+  <div class="loading" id="loading"><div class="spinner"></div><p>読み込み中</p></div>
+  <div id="content" style="display:none"></div>
+</div>
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="mtitle"></h2>
+      <button class="close-btn" id="closebtn">x</button>
+    </div>
+    <div class="yt-wrap"><div id="ytp"></div></div>
+    <div class="modal-foot">
+      <div style="flex:1">
+        <div class="prog-info" id="pinfo">動画を最後まで視聴すると完了ボタンが押せます</div>
+        <div class="prog-bar-wrap"><div class="prog-bar" id="pbar"></div></div>
+      </div>
+      <button class="done-btn" id="donebtn" disabled>受講完了を記録する</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+var G="https://script.google.com/macros/s/AKfycbyxrE8prYmQ66hHNkwFao4DK_yaiqbmqDTH9bC_DSMYQrRnceRMiqaqGViLdw14VQA6cg/exec";
+var EM="",CID=null,YTP=null,WT=null,LT=null;
+var COMP=[],VIDS=[],PERMS=[],CATS={},READY=false,PENDING=null;
+var PS=0,DUR=0;
+var P=new URLSearchParams(location.search);
+EM=(P.get("email")||"").trim().toLowerCase();
+document.getElementById("badge").textContent=EM||"不明";
+
+function toast(m,t){
+  var el=document.getElementById("toast");
+  el.textContent=m;
+  el.className="show "+(t||"ok");
+  setTimeout(function(){el.className=""},3500);
+}
+
+async function req(p){
+  var o={email:EM};
+  Object.keys(p).forEach(function(k){o[k]=p[k]});
+  var b=Object.keys(o).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(o[k])}).join("&");
+  var r=await fetch(G,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:b});
+  return r.json();
+}
+
+window.onYouTubeIframeAPIReady=function(){
+  READY=true;
+  if(PENDING) mkplayer(PENDING);
+};
+
+function mkplayer(ytid){
+  if(!READY){PENDING=ytid;return}
+  PENDING=null;
+  if(YTP){try{YTP.destroy()}catch(e){} YTP=null}
+  document.getElementById("ytp").innerHTML="";
+  PS=0;DUR=0;
+  YTP=new YT.Player("ytp",{
+    videoId:ytid,
+    width:"100%",height:"100%",
+    playerVars:{rel:0,modestbranding:1,enablejsapi:1,origin:"https://t-ishiguro-commits.github.io"},
+    events:{
+      onReady:function(e){DUR=e.target.getDuration();e.target.playVideo();LT=setInterval(function(){if(CID){var pct=DUR>0?Math.floor(PS/DUR*100):0;req({action:"addLog",videoId:CID,event:"視聴中",watchedSec:Math.floor(PS),pct:pct})}},30000)},
+      onStateChange:function(e){
+        if(e.data===1){
+          clearInterval(WT);
+          WT=setInterval(function(){
+            try{
+              var d=YTP.getDuration();
+              if(d>0){DUR=d;PS+=1;var pct=Math.min(100,Math.floor(PS/d*100));
+              document.getElementById("pbar").style.width=pct+"%";
+              document.getElementById("pinfo").textContent="視聴済み: "+pct+"% ("+Math.floor(PS/60)+"分"+Math.floor(PS%60)+"秒)";
+              if(pct>=90){clearInterval(WT);document.getElementById("pbar").style.width="100%";document.getElementById("pinfo").textContent="視聴完了！完了ボタンを押してください";document.getElementById("donebtn").disabled=false;document.getElementById("donebtn").className="done-btn on"}}
+            }catch(er){}
+          },1000);
+        } else {
+          clearInterval(WT);
+          if(CID&&e.data===2){var pct=DUR>0?Math.floor(PS/DUR*100):0;req({action:"addLog",videoId:CID,event:"一時停止",watchedSec:Math.floor(PS),pct:pct})}
+        }
+        if(e.data===0){
+          clearInterval(WT);
+          var pct=DUR>0?Math.floor(PS/DUR*100):0;
+          if(pct>=90){document.getElementById("pbar").style.width="100%";document.getElementById("pinfo").textContent="視聴完了！完了ボタンを押してください";document.getElementById("donebtn").disabled=false;document.getElementById("donebtn").className="done-btn on"}
+          else{document.getElementById("pinfo").textContent="視聴済み: "+pct+"% 最初から視聴してください"}
+        }
+      }
+    }
+  });
+}
+
+async function init(){
+  if(!EM){document.getElementById("loading").innerHTML="<div>URLが正しくありません</div>";return}
+  var ar=await req({action:"checkAdmin"});
+  if(ar.isAdmin){var al=document.getElementById("admin-link");al.href=G+"?page=admin&email="+encodeURIComponent(EM);al.style.display="inline-block"}
+  var vr=await req({action:"getVideos"});
+  var sr=await req({action:"getUserStatus"});
+  var cr=await req({action:"getCategoryTests"});
+  document.getElementById("loading").style.display="none";
+  document.getElementById("content").style.display="block";
+  PERMS=sr.permissions||[];
+  COMP=sr.completed||[];
+  VIDS=(vr.videos||[]).filter(function(v){return v.status==="公開"});
+  CATS=cr.tests||{};
+  render();
+}
+
+function render(){
+  var c=document.getElementById("content");
+  c.innerHTML="";
+  var cm={},co={},nc=[];
+  VIDS.forEach(function(v){var cat=(v.category||"").trim();if(!cat){nc.push(v)}else{if(!cm[cat])cm[cat]=[];cm[cat].push(v);co[cat]=v.catOrder||0}});
+  Object.keys(cm).sort(function(a,b){return co[a]-co[b]}).forEach(function(cat){mkcat(cat,cm[cat])});
+  if(nc.length)mkcat("",nc);
+}
+
+function mkcat(catName,vids){
+  var sec=document.createElement("div");
+  sec.className="cat-section";
+  if(catName){
+    var av=vids.filter(function(v){return PERMS.indexOf(v.id)!==-1});
+    var dc=av.filter(function(v){return COMP.indexOf(v.id)!==-1}).length;
+    var done=av.length>0&&dc===av.length;
+    var turl=CATS[catName]||"";
+    var hd=document.createElement("div");
+    hd.className="cat-header";
+    var tw=document.createElement("div");
+    tw.className="cat-title-wrap";
+    tw.innerHTML="<span class='cat-title'>📁 "+catName+"</span><span class='cat-badge'>"+dc+"/"+av.length+"完了</span><span class='cat-toggle'>▼</span>";
+    hd.appendChild(tw);
+    if(turl){
+      var tb=document.createElement("button");
+      tb.className="test-btn "+(done?"on":"off");
+      tb.textContent="📝 確認テスト";
+      tb.disabled=!done;
+      if(done)tb.addEventListener("click",function(){window.open(turl,"_blank")});
+      hd.appendChild(tb);
+    }
+    sec.appendChild(hd);
+    tw.addEventListener("click",function(){var g=sec.querySelector(".grid");var t=tw.querySelector(".cat-toggle");g.classList.toggle("hidden");t.classList.toggle("collapsed")});
+  }
+  var gr=document.createElement("div");
+  gr.className="grid";
+  vids.forEach(function(v){
+    var ok=PERMS.indexOf(v.id)!==-1;
+    var dn=COMP.indexOf(v.id)!==-1;
+    var cd=document.createElement("div");
+    cd.className="card "+(ok?"ok":"ng");
+    var ts=v.thumbUrl||"https://img.youtube.com/vi/"+v.youtubeId+"/mqdefault.jpg";
+    var st=dn?"受講完了":(ok?"視聴可能":"視聴許可なし");
+    var sc=dn?"done":(ok?"can":"");
+    cd.innerHTML="<div class='thumb' data-id='"+v.id+"' data-ytid='"+v.youtubeId+"' data-title='"+v.title+"' data-ok='"+(ok?1:0)+"'>"+(dn?"<div class='done-badge'>受講済み</div>":"")+(ok?"":"<div class='lock-badge'>未許可</div>")+"<img src='"+ts+"'><span>▶</span></div><div class='card-body'><h3>"+v.title+"</h3><div class='card-status "+sc+"'>"+st+"</div></div>";
+    gr.appendChild(cd);
+  });
+  sec.appendChild(gr);
+  document.getElementById("content").appendChild(sec);
+}
+
+document.getElementById("content").addEventListener("click",function(e){
+  var th=e.target.closest(".thumb");
+  if(!th)return;
+  if(th.dataset.ok!=="1"){toast("視聴許可がありません","err");return}
+  openM(th.dataset.id,th.dataset.ytid,th.dataset.title);
+});
+
+function openM(id,ytid,title){
+  CID=id;
+  document.getElementById("mtitle").textContent=title;
+  document.getElementById("donebtn").disabled=true;
+  document.getElementById("donebtn").className="done-btn";
+  document.getElementById("donebtn").textContent="受講完了を記録する";
+  document.getElementById("donebtn").style.background="";
+  document.getElementById("pinfo").textContent="動画を最後まで視聴すると完了ボタンが押せます";
+  document.getElementById("pbar").style.width="0%";
+  document.getElementById("overlay").className="overlay show";
+  req({action:"addLog",videoId:id,event:"開始",watchedSec:0,pct:0});
+  mkplayer(ytid);
+}
+
+document.getElementById("closebtn").addEventListener("click",function(){closeM()});
+document.getElementById("overlay").addEventListener("click",function(e){if(e.target===this)closeM()});
+
+function closeM(){
+  clearInterval(WT);clearInterval(LT);
+  if(CID){var pct=DUR>0?Math.floor(PS/DUR*100):0;req({action:"addLog",videoId:CID,event:"終了",watchedSec:Math.floor(PS),pct:pct})}
+  try{if(YTP){YTP.stopVideo();YTP.destroy();YTP=null}}catch(e){}
+  document.getElementById("ytp").innerHTML="";
+  document.getElementById("overlay").className="overlay";
+  CID=null;PS=0;
+}
+
+document.getElementById("donebtn").addEventListener("click",async function(){
+  var btn=document.getElementById("donebtn");
+  if(btn.disabled)return;
+  if(!confirm("受講完了を記録します。よろしいですか？"))return;
+  btn.disabled=true;btn.textContent="記録中...";
+  var res=await req({action:"recordCompletion",videoId:CID});
+  if(res.success){
+    btn.textContent="受講完了済み";btn.style.background="var(--ok)";
+    toast("受講完了が記録されました！","ok");
+    if(COMP.indexOf(CID)===-1)COMP.push(CID);
+    setTimeout(function(){closeM();render()},1500);
+  } else {
+    btn.disabled=false;btn.className="done-btn on";btn.textContent="受講完了を記録する";
+    toast("エラー: "+(res.message||"失敗"),"err");
+  }
+});
+
+init();
+</script>
+</body>
+</html>
