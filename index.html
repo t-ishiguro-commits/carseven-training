@@ -214,11 +214,17 @@ function createPlayer(ytId){
         }
         if(e.data===YT.PlayerState.ENDED){
           clearInterval(watchTimer);
-          // 動画終了時は完了とみなす
-          document.getElementById("progress-bar").style.width="100%";
-          document.getElementById("progress-info").textContent="視聴完了！受講完了ボタンを押してください";
-          document.getElementById("complete-btn").disabled=false;
-          document.getElementById("complete-btn").className="complete-btn enabled";
+          // 動画終了時は再生時間が90%以上の場合のみ完了とみなす
+          var pct=currentDuration>0?Math.floor(playedSeconds/currentDuration*100):0;
+          if(pct>=90){
+            document.getElementById("progress-bar").style.width="100%";
+            document.getElementById("progress-info").textContent="視聴完了！受講完了ボタンを押してください";
+            document.getElementById("complete-btn").disabled=false;
+            document.getElementById("complete-btn").className="complete-btn enabled";
+          } else {
+            document.getElementById("progress-info").textContent="視聴済み: "+pct+"%　最初から視聴してください";
+          }
+        }
         }
       }
     }
